@@ -241,3 +241,97 @@ button {
 .row-controls button:hover {
     background-color: #e0e0e0;
 }
+
+.photo-block {
+    margin-bottom: 16px; /* Space between photo blocks */
+}
+
+.photo-title input,
+.photo-description textarea {
+    width: 100%; /* Use full width */
+    box-sizing: border-box; /* Include padding/border in width */
+    margin-top: 8px; /* Add spacing above fields */
+    padding: 8px;
+    font-size: 14px; /* Reasonable font size */
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.photo-title input:focus,
+.photo-description textarea:focus {
+    outline: none;
+    border-color: #007bff; /* Highlight border on focus */
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
+
+.photo-description textarea {
+    resize: vertical; /* Allow vertical resizing only */
+    height: 60px; /* Default height */
+}
+
+.photo-block {
+    margin-bottom: 24px; /* Space between different blocks */
+}
+
+.photo-title input {
+    width: 100%; /* Ensure title occupies full width */
+    box-sizing: border-box; /* Include padding and border in width */
+    margin-bottom: 16px; /* Spacing below the title */
+    padding: 10px; /* Add padding */
+    font-size: 18px; /* Make the title stand out */
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.photo-description textarea {
+    width: 100%; /* Full width for descriptions */
+    box-sizing: border-box; /* Include padding in width calculation */
+    resize: vertical; /* Allow resizing only vertically */
+    padding: 8px; /* Text area padding */
+    font-size: 14px; /* Readable font size for descriptions */
+    margin-top: 8px; /* Space above textareas */
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+.two-photo-columns {
+    display: flex; /* Use flexbox to align columns horizontally */
+    gap: 16px; /* Add space between the columns */
+}
+
+.column {
+    flex: 1; /* Ensure both columns take equal width */
+    display: flex;
+    flex-direction: column;
+    gap: 8px; /* Add space between image and description */
+}
+
+.photo-title input {
+    width: 100%; /* Full width for title */
+    box-sizing: border-box; /* Include padding in width */
+    margin-bottom: 16px; /* Spacing below the title */
+    padding: 10px;
+    font-size: 18px; /* Slightly larger title font */
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.photo-container {
+    width: 100%; /* Ensure images are responsive within the column */
+    aspect-ratio: 16 / 9; /* Optional: Control aspect ratio */
+    background-color: #f0f0f0; /* Placeholder background for images */
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    display: flex;
+    justify-content: center; /* Center the image/content */
+    align-items: center;
+}
+
+.photo-description textarea {
+    width: 100%; /* Full width for textareas */
+    box-sizing: border-box;
+    resize: vertical; /* Allow vertical resizing */
+    padding: 8px;
+    font-size: 14px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}

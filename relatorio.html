@@ -96,13 +96,36 @@
     function getBlockContent(blockType) {
         if (blockType === 'two-photo') {
             return `
-                    <div class="column">
+        <div class="photo-block">
+            <!-- Block title -->
+            <div class="photo-title">
+                <input type="text" placeholder="Enter Block Title..." class="photo-title-input" id="title-block-${blockCounter}" />
+            </div>
+
+            <!-- Two photo columns container -->
+            <div class="two-photo-columns">
+                <!-- First photo column (Before) -->
+                <div class="column">
+                    <div class="photo-container">
                         ${createPhotoContainerHtml(`block-${blockCounter}-before`)}
                     </div>
-                    <div class="column">
+                    <div class="photo-description">
+                        <textarea placeholder="Enter Description for Before Image..." class="photo-description-input" id="description-block-${blockCounter}-before"></textarea>
+                    </div>
+                </div>
+
+                <!-- Second photo column (After) -->
+                <div class="column">
+                    <div class="photo-container">
                         ${createPhotoContainerHtml(`block-${blockCounter}-after`)}
                     </div>
-                `;
+                    <div class="photo-description">
+                        <textarea placeholder="Enter Description for After Image..." class="photo-description-input" id="description-block-${blockCounter}-after"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
         }
         if (blockType === 'four-photo') {
             return Array(4).fill(null).map((_, i) => `
@@ -272,7 +295,7 @@
         pdf.setTextColor("#133058");
 
         const wrappedTitle = pdf.splitTextToSize(title, maxTitleWidth);
-        const lineHeight = 12;
+        const lineHeight = 17;
         let finalYTitlePosition = yTitlePosition;
 
         // Render wrapped title on the front page
@@ -289,7 +312,7 @@
         pdf.setFillColor("#133058");
         pdf.rect(0, rectYPosition, pageWidth, rectHeight, "F");
 
-        const combinedText = `${formData.maquina || "Máquina não definida"} + ${formData.modelo || "Modelo não definido"}`;
+        const combinedText = `${formData.maquina || "Máquina não definida"} ${formData.modelo || "Modelo não definido"}`;
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(18);
         pdf.setTextColor("#FFFFFF");
@@ -334,7 +357,7 @@
                 pdf.addImage(image, "JPEG", 0, imageYPosition, imageWidth, imageHeight);
 
                 // Save or Render Additional Pages
-                addSubsequentPages(pdf, pageWidth, pageHeight, headerText, footerText, defaultBackgroundPath);
+                addSubsequentPages(pdf, pageWidth, pageHeight, headerText, footerText, defaultBackgroundPath, formData.cliente);
             };
 
             image.src = imageSource;
@@ -360,18 +383,16 @@
      * @param {string} headerText - Header text
      * @param {string} footerText - Footer text
      * @param {string} bgImagePath - Background image path
+     * @param {string} cliente
      */
-    async function addSubsequentPages(pdf, pageWidth, pageHeight, headerText, footerText, bgImagePath) {
+    async function addSubsequentPages(pdf, pageWidth, pageHeight, headerText, footerText, bgImagePath, cliente) {
         // Example: Adding a second page with the template
-        pdf.addPage();
-        await renderPageTemplate(pdf, pageWidth, pageHeight, headerText, footerText, bgImagePath);
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(12);
-        pdf.text("This is some example content for the second page.", 20, 50);
+
+        await processTwoPhotoBlocks(pdf, pageWidth, pageHeight, headerText, footerText, bgImagePath, cliente);
 
         // Example: Adding a third page with the template
         pdf.addPage();
-        await renderPageTemplate(pdf, pageWidth, pageHeight, headerText, footerText, bgImagePath);
+        await renderPageTemplate(pdf, pageWidth, pageHeight, headerText, footerText, bgImagePath, cliente);
         pdf.text("This is some example content for the third page.", 20, 50);
 
         // Save the PDF
@@ -385,7 +406,7 @@
      * Function to render the page template with a background image, header, and footer.
      * Ensures the background image is fully loaded before continuing.
      */
-    async function renderPageTemplate(pdf, pageWidth, pageHeight, headerText, footerText) {
+    async function renderPageTemplate(pdf, pageWidth, pageHeight, headerText, footerText, bgImagePaths, cliente) {
         // Define header height
         const headerHeight = 20;
 
@@ -395,7 +416,7 @@
         const logoHeight = 11; // Height of the logo
 
         // Offset where gradient and text should start (just after the logo)
-        const gradientStartX = logoWidth - 10 ; // 5 units margin before and after the logo
+        const gradientStartX = logoWidth - 10; // 5 units margin before and after the logo
 
         // Create a gradient using a canvas
         const canvas = document.createElement("canvas");
@@ -406,7 +427,7 @@
         // Create the gradient (start immediately after the logo and go to the right)
         const gradient = ctx.createLinearGradient(gradientStartX, 0, pageWidth, 0);
         gradient.addColorStop(0, "#133058"); // Dark blue
-        gradient.addColorStop(1, "#5b80b7"); // White at the far right
+        gradient.addColorStop(1, "#5b80b7"); // Light blue
 
         // Fill the gradient rectangle
         ctx.fillStyle = gradient;
@@ -434,7 +455,7 @@
 
         // Add the header text properly aligned inside the gradient
         pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(10);
+        pdf.setFontSize(20);
         pdf.setTextColor("#FFFFFF"); // White text to match gradient background
         const textX = gradientStartX + 25; // Adjust text position inside the gradient
         const textY = headerHeight / 2 + 3; // Vertically center the text
@@ -455,12 +476,27 @@
             bgImage.src = bgImagePath;
         });
 
-        // Add the footer content
-        pdf.setFont("helvetica", "italic");
+        // Add the default footer (rectangle at the bottom of the page)
+        const footerHeight = 12; // Height of the footer rectangle in px
+        pdf.setFillColor("#133058"); // Set dark blue color for the footer rectangle
+        pdf.rect(0, pageHeight - footerHeight, pageWidth, footerHeight, "F"); // ('F' for fill)
+
+        // Footer content text settings
+        pdf.setFont("helvetica", "normal");
         pdf.setFontSize(8);
-        pdf.setTextColor("#133058"); // Footer text color
-        const pageNumber = pdf.internal.getNumberOfPages();
-        pdf.text(`${footerText} ${pageNumber}`, pageWidth - 20, pageHeight - 10);
+        pdf.setTextColor("#FFFFFF"); // White text for the footer
+
+        // Left-aligned text for footer
+        const footerLeftText = "Relatório confidencial. Protegido pela LGPD (Lei nº 13.709/2018).";
+        const footerLeftX = 10; // Margin for the left-aligned text
+        const footerY = pageHeight - footerHeight / 2 + 1; // Center vertically in the footer
+        pdf.text(footerLeftText, footerLeftX, footerY);
+
+        // Right-aligned text for footer (Cliente field)
+        const footerRightText = cliente || ""; // If no cliente value is provided, fallback to an empty string
+        const footerRightX = pageWidth - 40 - pdf.getTextWidth(footerRightText); // Align to the right side with margin
+        pdf.setFontSize(20);
+        pdf.text(footerRightText, footerRightX, footerY);
     }
 
     // Helper: Extract static form values
@@ -479,42 +515,6 @@
     }
 
 
-    // Helper: Extract block content for PDF
-    function getBlockContentForPDF(block) {
-        const title = block.querySelector('.block-header h4').textContent.trim();
-
-        // Check if the block is a spreadsheet
-        if (block.querySelector('table.dynamic-table')) {
-            const table = block.querySelector('table.dynamic-table');
-
-            // Extract headers
-            const headers = Array.from(table.querySelectorAll('thead th input'))
-                .map(input => input.value || "N/A");
-
-            // Extract rows
-            const rows = Array.from(table.querySelectorAll('tbody tr')).map(row =>
-                Array.from(row.querySelectorAll('td input')).map(input => input.value || "N/A")
-            );
-
-            return { title, type: "table", headers, rows };
-        }
-
-        // Fallback for other block types
-        const contentLines = [];
-        const inputs = block.querySelectorAll('input[type="text"]');
-        inputs.forEach(input => {
-            contentLines.push({ type: "text", value: input.value || "N/A" });
-        });
-
-        const images = block.querySelectorAll('.photo-container img');
-        images.forEach(img => {
-            if (img.src) {
-                contentLines.push({ type: "image", value: img.src });
-            }
-        });
-
-        return { title, contentLines };
-    }
     function addRow(button) {
         // Get the table body
         const table = button.closest('.spreadsheet-container').querySelector('.dynamic-table');
@@ -587,23 +587,154 @@
         });
     }
 
-    function addImageToPDF(pdf, imageSource, pageWidth, yImagePosition, maxHeight) {
-        const imgWidth = pageWidth - 20; // Add some margin (adjustable)
-        const reader = new Image();
+    async function processTwoPhotoBlocks(pdf, pageWidth, pageHeight, headerText, footerText, bgImagePath, cliente) {
+        // Retrieve all dynamic blocks
+        const dynamicBlocks = document.querySelectorAll(".dynamic-blocks .block");
 
-        reader.onload = function () {
-            // Calculate aspect ratio to maintain proportions
-            const aspectRatio = reader.height / reader.width;
-            const imgHeight = Math.min(maxHeight, imgWidth * aspectRatio); // Scale down to fit height if needed
+        for (const block of dynamicBlocks) {
+            // Check if this block is of type "two-photo" by identifying its unique structure
+            const isTwoPhotoBlock = block.querySelector(".photo-title-input") &&
+                block.querySelector(".two-photo-columns");
+            if (!isTwoPhotoBlock) {
+                continue; // If not a two-photo block, skip this block
+            }
 
-            // Center the image horizontally
-            const xCentered = (pageWidth - imgWidth) / 2;
+            // Extract the two-photo block's data
+            const title = block.querySelector(".photo-title-input")?.value.trim() || "Title not provided.";
 
-            // Add the image to the PDF
-            pdf.addImage(imageSource, "JPEG", xCentered, yImagePosition, imgWidth, imgHeight);
+            // Fetch the "Before" image and description
+            const beforeColumn = block.querySelector(".two-photo-columns .column:first-child");
+            const beforeImage = beforeColumn?.querySelector("img")?.src || null;
+            const beforeDescription = beforeColumn?.querySelector("textarea")?.value.trim() || "No description.";
+
+            // Fetch the "After" image and description
+            const afterColumn = block.querySelector(".two-photo-columns .column:last-child");
+            const afterImage = afterColumn?.querySelector("img")?.src || null;
+            const afterDescription = afterColumn?.querySelector("textarea")?.value.trim() || "No description.";
+
+            // Skip rendering if no images are present
+            if (!beforeImage && !afterImage) {
+                continue;
+            }
+
+            pdf.addPage();
+            await renderPageTemplate(pdf, pageWidth, pageHeight, cliente, footerText, bgImagePath, cliente);
+
+            pdf.setFont("helvetica", "normal");
+            pdf.setFontSize(18);
+
+            // Render the two-photo block's content into the PDF
+            await renderTwoPhotoBlockContent(pdf, {
+                title,
+                beforeImage,
+                beforeDescription,
+                afterImage,
+                afterDescription,
+            });
+        }
+    }
+    async function renderTwoPhotoBlockContent(pdf, { title, beforeImage, beforeDescription, afterImage, afterDescription }) {
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+
+        // Set the text color for the title
+        const blueColor = "#133058";
+
+        // Add the title at the top (centered, blue color, font size 30)
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(36);
+        pdf.setTextColor(blueColor);
+        pdf.text(title, pageWidth / 2, 45, { align: "center" }); // Title at y = 45
+
+        // Define the dimensions for the images and descriptions
+        const imageWidth = pageWidth * 0.4; // Images occupy 40% of the page width
+        const imageHeight = imageWidth * 0.75; // Maintain a 4:3 aspect ratio
+        const descriptionWidth = pageWidth * 0.15; // Description occupies 15% of the width
+        const paddingBetween = 30; // Padding between blocks
+        const borderWidth = 4; // Border width for the image
+
+        // Centering logic
+        const verticalCenter = (pageHeight - 2 * imageHeight - paddingBetween) / 2; // Align both images and padding in the center
+
+        const beforeImageY = verticalCenter; // Y position for the "Before" image
+        const afterImageY = beforeImageY + imageHeight + paddingBetween; // Y position for "After" image
+        const centerX = (pageWidth - imageWidth) / 2; // Center the image horizontally
+        const descriptionX = centerX - descriptionWidth - 10; // Place the description on the left
+
+        const renderVerticalText = (pdf, text, centerX, startY) => {
+            const rotationAngle = -270; // Rotate the entire block so the bottom points to the right
+
+            // Reverse the text to display it inverted vertically from bottom to top
+            const reversedText = text.split("").join("");
+
+            // Calculate the total height of the text block
+            const textDimensions = pdf.getTextDimensions(reversedText);
+            const textHeight = textDimensions.w; // The block height in rotated view is its original width
+
+            // Adjust the starting Y coordinate to make it display bottom-to-top
+            const adjustedStartY = startY + textHeight;
+
+            // Render the entire reversed text as a single rotated block
+            pdf.text(reversedText, centerX, adjustedStartY, { angle: rotationAngle });
         };
 
-        reader.src = imageSource;
+        // Render the "Before" image and description
+        if (beforeImage) {
+            pdf.setFont("montserrat", "bold");
+            pdf.setFontSize(22);
+
+            // Start rendering text with a 20px margin from the top and center alignment
+            const textStartY = beforeImageY + 20; // Add a margin of 20px from the top of the image
+            renderVerticalText(pdf, beforeDescription, descriptionX, textStartY); // Render vertical text with correct rotation
+
+            // Add the "Before" image with a border and shadow effect
+            await addImageWithBorder(pdf, beforeImage, centerX, beforeImageY, imageWidth, imageHeight, borderWidth);
+        }
+
+        // Render the "After" image and description
+        if (afterImage) {
+            pdf.setFont("montserrat", "bold");
+            pdf.setFontSize(22);
+
+            // Start rendering text with a 20px margin from the top and center alignment
+            const textStartY = afterImageY + 20; // Add a margin of 20px from the top of the image
+            renderVerticalText(pdf, afterDescription, descriptionX, textStartY); // Render vertical text with correct rotation
+
+            // Add the "After" image with a border and shadow effect
+            await addImageWithBorder(pdf, afterImage, centerX, afterImageY, imageWidth, imageHeight, borderWidth);
+        }
+    }
+
+    async function addImageWithBorder(pdf, imageSource, x, y, width, height, borderWidth) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+
+            img.onload = function () {
+                // Scale the image size by 20%
+                const scaledWidth = width * 1.2;
+                const scaledHeight = height * 1.2;
+
+                // Adjust positions to ensure scaling keeps the image centered
+                const borderX = x - (scaledWidth - width) / 2 - borderWidth;
+                const borderY = y - (scaledHeight - height) / 2 - borderWidth;
+
+                // Ensure the white border surrounding the image
+                pdf.setDrawColor(255, 255, 255); // White color for border
+                pdf.rect(borderX, borderY, scaledWidth + 2 * borderWidth, scaledHeight + 2 * borderWidth, "F");
+
+                // Draw the actual image inside the scaled border
+                pdf.addImage(img, "JPEG", borderX + borderWidth, borderY + borderWidth, scaledWidth, scaledHeight);
+
+                resolve(); // Resolve when image is added
+            };
+
+            img.onerror = function () {
+                console.error("Failed to load image:", imageSource);
+                reject(new Error("Image could not be loaded."));
+            };
+
+            img.src = imageSource; // Start loading the image
+        });
     }
 </script>
 
