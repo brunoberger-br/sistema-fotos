@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Form with Photo Labels</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<!-- Sidebar -->
+<div class="sidebar">
+    <h2>Add a Block</h2>
+    <button class="block-type-btn" onclick="addBlock('two-photo')">Two Photo Block</button>
+    <button class="block-type-btn" onclick="addBlock('four-photo')">Four Photo Block</button>
+    <button class="block-type-btn" onclick="addBlock('spreadsheet')">Spreadsheet Block</button>
+    <button class="block-type-btn" onclick="addBlock('title-photo')">Title & Photo Block</button>
+    <button id="generate-pdf" onclick="generatePDF()">Generate PDF</button>
+</div>
+
+<!-- Main Content -->
+<div class="container">
+    <h1>Dynamic Form with Photo Labeling</h1>
+
+    <!-- Static Fields -->
+    <form id="report-form">
+        <label for="relatorio">Relatório (Number):</label>
+        <input type="number" id="relatorio" placeholder="Enter relatório" required>
+
+        <label for="cliente">Cliente (String):</label>
+        <input type="text" id="cliente" placeholder="Enter cliente" required>
+
+        <label for="maquina">Máquina (String):</label>
+        <input type="text" id="maquina" placeholder="Enter máquina" required>
+
+        <label for="modelo">Modelo (String):</label>
+        <input type="text" id="modelo" placeholder="Enter modelo" required>
+
+        <label for="titulo">Título (String):</label>
+        <input type="text" id="titulo" placeholder="Enter título" required>
+
+        <label for="backgroundImage">Upload Background Image:</label>
+        <input type="file" id="backgroundImage" accept="image/*">
+    </form>
+
+    <!-- Dynamic Blocks Container -->
+    <div class="dynamic-blocks" id="dynamic-blocks">
+        <h2>Dynamic Blocks</h2>
+    </div>
+</div>
+
+<script>
+    let blockCounter = 0;
+
+    function addBlock(blockType) {
+        blockCounter++;
+        const dynamicBlocksContainer = document.querySelector('#dynamic-blocks');
+
+        const blockDiv = document.createElement('div');
+        blockDiv.classList.add('block');
+        blockDiv.setAttribute('data-block-id', blockCounter);
+
+        const blockContent = getBlockContent(blockType);
+
+        if (!blockContent) {
+            alert("Invalid block type selected!");
+            return;
+        }
+
+        blockDiv.innerHTML = `
+                <div class="block-header">
+                    <h4>${getBlockTitle(blockType)}</h4>
+                </div>
+                <div class="block-content">${blockContent}</div>
+                <div class="block-controls">
+                    <button type="button" onclick="moveBlockUp(${blockCounter})">Move Up</button>
+                    <button type="button" onclick="moveBlockDown(${blockCounter})">Move Down</button>
+                    <button type="button" onclick="removeBlock(${blockCounter})">Remove Block</button>
+                </div>
+            `;
+
+        dynamicBlocksContainer.appendChild(blockDiv);
+    }
+
+    function getBlockTitle(blockType) {
+        if (blockType === 'two-photo') return "Two Photo Block";
+        if (blockType === 'four-photo') return "Four Photo Block";
+        if (blockType === 'spreadsheet') return "Spreadsheet Block";
+        if (blockType === 'title-photo') return "Title & Photo Block";
+        return "Unknown Block";
+    }
+
+    function getBlockContent(blockType) {
+        if (blockType === 'two-photo') {
+            return `
+                    <div class="column">
+                        ${createPhotoContainerHtml(`block-${blockCounter}-before`)}
+                    </div>
+                    <div class="column">
+                        ${createPhotoContainerHtml(`block-${blockCounter}-after`)}
+                    </div>
+                `;
+        }
+        if (blockType === 'four-photo') {
+            return Array(4).fill(null).map((_, i) => `
+                    <div class="column">
+                        ${createPhotoContainerHtml(`block-${blockCounter}-photo${i}`)}
+                    </div>
+                `).join('');
+        }
+        if (blockType === 'spreadsheet') {
+            return `
+        <div class="spreadsheet-container">
+            <table class="dynamic-table">
+                <thead>
+                    <tr>
+                        <th><input type="text" placeholder="Header 1"></th>
+                        <th><input type="text" placeholder="Header 2"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><input type="text" placeholder="Value 1"></td>
+                        <td><input type="text" placeholder="Value 2"></td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="table-controls">
+                <button type="button" onclick="addColumn(this)">Add Column</button>
+                <button type="button" onclick="removeColumn(this)">Remove Last Column</button>
+            </div>
+            <div class="row-controls">
+                <button type="button" onclick="addRow(this)">Add Row</button>
+                <button type="button" onclick="removeRow(this)">Remove Last Row</button>
+            </div>
+        </div>
+    `;
+        }
+        if (blockType === 'title-photo') {
+            return `
+                    <div class="column">
+                        <label>Title:</label>
+                        <input type="text">
+                    </div>
+                    <div class="column">
+                        ${createPhotoContainerHtml(`block-${blockCounter}-photo`)}
+                    </div>
+                `;
+        }
+        return null;
+    }
+
+    function createPhotoContainerHtml(id) {
+        return `
+                <div class="photo-container" id="${id}">
+                    <input type="file" style="display: none;" accept="image/*" onchange="handlePhotoUpload(event, '${id}')">
+                    <button class="upload-btn" onclick="document.getElementById('${id}').querySelector('input[type=file]').click();">Upload Photo</button>
+                    <img>
+                    <button class="remove-btn" onclick="removePhoto('${id}')">✖</button>
+                </div>
+            `;
+    }
+
+    function handlePhotoUpload(event, containerId) {
+        const container = document.getElementById(containerId);
+        const input = event.target;
+        const preview = container.querySelector('img');
+        const uploadButton = container.querySelector('.upload-btn');
+        const file = input.files[0];
+
+        if (file) {
+            const fileReader = new FileReader();
+            fileReader.onload = function (e) {
+                preview.src = e.target.result;
+                preview.style.display = 'block'; // Show image preview
+                uploadButton.style.display = 'none'; // Hide upload button
+            };
+            fileReader.readAsDataURL(file);
+        }
+    }
+
+    function removePhoto(containerId) {
+        const container = document.getElementById(containerId);
+        const input = container.querySelector('input[type="file"]');
+        const preview = container.querySelector('img');
+        const uploadButton = container.querySelector('.upload-btn');
+
+        input.value = ''; // Clear the file input
+        preview.src = ''; // Clear the preview image
+        preview.style.display = 'none'; // Hide the image preview
+        uploadButton.style.display = 'flex'; // Show the upload button
+    }
+
+    function removeBlock(blockId) {
+        const blockElement = document.querySelector(`[data-block-id="${blockId}"]`);
+        if (blockElement) blockElement.remove();
+    }
+
+    function moveBlockUp(blockId) {
+        const blockElement = document.querySelector(`[data-block-id="${blockId}"]`);
+        const previousBlock = blockElement.previousElementSibling;
+        if (previousBlock) {
+            blockElement.parentNode.insertBefore(blockElement, previousBlock);
+        }
+    }
+
+    function moveBlockDown(blockId) {
+        const blockElement = document.querySelector(`[data-block-id="${blockId}"]`);
+        const nextBlock = blockElement.nextElementSibling;
+        if (nextBlock) {
+            blockElement.parentNode.insertBefore(nextBlock, blockElement);
+        }
+    }
+
+    async function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF();
+
+        const pageWidth = pdf.internal.pageSize.getWidth(); // Page width
+        const pageHeight = pdf.internal.pageSize.getHeight(); // Page height
+        const formData = getStaticFormValues();
+
+        // Header and Footer content (for subsequent pages)
+        const headerText = "Header for Subsequent Pages"; // Replace with actual content
+        const footerText = "Page"; // Footer text
+        const defaultBackgroundPath = "images/default-background.jpg"; // Background for subsequent pages
+
+        // LOGO - Front page
+        const logoPath = "images/logofas.jpg";
+        const logoWidth = 80;
+        const logoHeight = 30;
+        const logoX = 10;
+        const logoY = 10;
+
+        // Add logo to the front page
+        pdf.addImage(logoPath, "JPEG", logoX, logoY, logoWidth, logoHeight);
+
+        // Static fields - Front page
+        const staticFields = [
+            ["Relatório", formData.relatorio],
+            ["Cliente", formData.cliente],
+            ["Máquina", formData.maquina],
+            ["Modelo", formData.modelo],
+        ];
+        const xRightAlign = pageWidth - 60;
+        let yText = logoY + 5;
+        const lineSpacing = 7;
+
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor("#133058");
+
+        // Render static fields on the front page
+        staticFields.forEach(([label, value]) => {
+            const labelWidth = pdf.getTextWidth(`${label}:`);
+            pdf.text(`${label}:`, xRightAlign - labelWidth - 5, yText);
+            pdf.setFont("helvetica", "normal");
+            pdf.text(`${value || "N/A"}`, xRightAlign, yText);
+            yText += lineSpacing;
+        });
+
+        // Title - Front page
+        const title = formData.titulo || "Título não definido";
+        const titleFontSize = 45;
+        const maxTitleWidth = 180;
+        const yTitlePosition = logoY + logoHeight + 30;
+
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(titleFontSize);
+        pdf.setTextColor("#133058");
+
+        const wrappedTitle = pdf.splitTextToSize(title, maxTitleWidth);
+        const lineHeight = 12;
+        let finalYTitlePosition = yTitlePosition;
+
+        // Render wrapped title on the front page
+        wrappedTitle.forEach((line, index) => {
+            const lineWidth = pdf.getTextWidth(line);
+            const xCenteredTitle = (pageWidth - lineWidth) / 2;
+            pdf.text(line, xCenteredTitle, yTitlePosition + index * lineHeight);
+            finalYTitlePosition = yTitlePosition + index * lineHeight;
+        });
+
+        // Rectangle below the title - Front page
+        const rectYPosition = finalYTitlePosition + 20;
+        const rectHeight = 30;
+        pdf.setFillColor("#133058");
+        pdf.rect(0, rectYPosition, pageWidth, rectHeight, "F");
+
+        const combinedText = `${formData.maquina || "Máquina não definida"} + ${formData.modelo || "Modelo não definido"}`;
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(18);
+        pdf.setTextColor("#FFFFFF");
+
+        const textWidth = pdf.getTextWidth(combinedText);
+        const xTextCentered = (pageWidth - textWidth) / 2;
+        const yTextCentered = rectYPosition + rectHeight / 2 + 3;
+        pdf.text(combinedText, xTextCentered, yTextCentered);
+
+        // Rectangle and Disclaimer at the Bottom of the First Page
+        const bottomRectHeight = 15;
+        const bottomRectYPosition = pageHeight - bottomRectHeight; // Position near the bottom of the page
+        pdf.setFillColor("#133058");
+        pdf.rect(0, bottomRectYPosition, pageWidth, bottomRectHeight, "F");
+
+        const disclaimerText = "Este relatório é confidencial e de uso exclusivo. Proibida qualquer reprodução sem autorização prévia do remetente, conforme LGPD (Lei nº 13.709/2018).";
+        const textXMargin = 5;
+        const textYPosition = bottomRectYPosition + bottomRectHeight / 2 + 2; // Center disclaimer vertically
+
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(8);
+        pdf.setTextColor("#FFFFFF");
+
+        const wrappedDisclaimer = pdf.splitTextToSize(disclaimerText, pageWidth - textXMargin * 2);
+        pdf.text(wrappedDisclaimer, textXMargin, textYPosition, { align: "justify" });
+
+        // Add Image to Fill Space Between the Title Rectangle and Bottom Disclaimer
+        const uploadedImageInput = document.getElementById("backgroundImage");
+        const defaultImagePath = "images/maquina.png";
+
+        // If an uploaded image exists, load it dynamically; otherwise, use the default image
+        const imageYPosition = rectYPosition + rectHeight; // Position image below the main rectangle
+        const availableHeight = bottomRectYPosition - imageYPosition; // Space available for the image
+
+        const loadImageAndAddToPage = (imageSource) => {
+            const image = new Image();
+            image.onload = function () {
+                const imageWidth = pageWidth;
+                const imageHeight = availableHeight;
+
+                // Add the image to the front page
+                pdf.addImage(image, "JPEG", 0, imageYPosition, imageWidth, imageHeight);
+
+                // Save or Render Additional Pages
+                addSubsequentPages(pdf, pageWidth, pageHeight, headerText, footerText, defaultBackgroundPath);
+            };
+
+            image.src = imageSource;
+        };
+
+        if (uploadedImageInput.files && uploadedImageInput.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                loadImageAndAddToPage(e.target.result);
+            };
+            reader.readAsDataURL(uploadedImageInput.files[0]);
+        } else {
+            // Use default image if no user image is uploaded
+            loadImageAndAddToPage(defaultImagePath);
+        }
+    }
+
+    /**
+     * Function to add subsequent pages with a template applied
+     * @param {jsPDF} pdf - jsPDF instance
+     * @param {number} pageWidth - Width of the page
+     * @param {number} pageHeight - Height of the page
+     * @param {string} headerText - Header text
+     * @param {string} footerText - Footer text
+     * @param {string} bgImagePath - Background image path
+     */
+    async function addSubsequentPages(pdf, pageWidth, pageHeight, headerText, footerText, bgImagePath) {
+        // Example: Adding a second page with the template
+        pdf.addPage();
+        await renderPageTemplate(pdf, pageWidth, pageHeight, headerText, footerText, bgImagePath);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(12);
+        pdf.text("This is some example content for the second page.", 20, 50);
+
+        // Example: Adding a third page with the template
+        pdf.addPage();
+        await renderPageTemplate(pdf, pageWidth, pageHeight, headerText, footerText, bgImagePath);
+        pdf.text("This is some example content for the third page.", 20, 50);
+
+        // Save the PDF
+        pdf.save("dynamic-form-report.pdf");
+    }
+
+    /**
+     * Function to render the page template (header, footer, background) for subsequent pages
+     */
+    /**
+     * Function to render the page template with a background image, header, and footer.
+     * Ensures the background image is fully loaded before continuing.
+     */
+    async function renderPageTemplate(pdf, pageWidth, pageHeight, headerText, footerText) {
+        // Define the background image path
+        const bgImagePath = "images/background.png";
+
+        // Wait for the background image to load
+        await new Promise((resolve, reject) => {
+            const bgImage = new Image();
+            bgImage.onload = function () {
+                // Add the background image to cover the entire page
+                pdf.addImage(bgImage, "JPEG", 0, 0, pageWidth, pageHeight);
+                resolve(); // Resolve the promise after the image is added
+            };
+            bgImage.onerror = function () {
+                console.error("Failed to load background image:", bgImagePath);
+                reject("Image could not be loaded.");
+            };
+            bgImage.src = bgImagePath; // Trigger the image loading
+        });
+
+        // Add the header
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(10);
+        pdf.setTextColor("#133058");
+        pdf.text(headerText, 10, 10);
+
+        // Add the footer with the page number
+        pdf.setFont("helvetica", "italic");
+        pdf.setFontSize(8);
+        pdf.setTextColor("#133058");
+        const pageNumber = pdf.internal.getNumberOfPages();
+        pdf.text(`${footerText} ${pageNumber}`, pageWidth - 20, pageHeight - 10);
+    }
+    // Helper: Extract static form values
+    // Fetch static form field values as an object keyed by field IDs
+    function getStaticFormValues() {
+        const form = document.getElementById('report-form');
+        const inputs = form.querySelectorAll('input'); // Select all inputs inside the form
+
+        // Create an object where keys are input IDs and values are their current values
+        const formData = {};
+        inputs.forEach(input => {
+            formData[input.id] = input.value || null; // Assign form data by ID, set null if empty
+        });
+
+        return formData;
+    }
+
+
+    // Helper: Extract block content for PDF
+    function getBlockContentForPDF(block) {
+        const title = block.querySelector('.block-header h4').textContent.trim();
+
+        // Check if the block is a spreadsheet
+        if (block.querySelector('table.dynamic-table')) {
+            const table = block.querySelector('table.dynamic-table');
+
+            // Extract headers
+            const headers = Array.from(table.querySelectorAll('thead th input'))
+                .map(input => input.value || "N/A");
+
+            // Extract rows
+            const rows = Array.from(table.querySelectorAll('tbody tr')).map(row =>
+                Array.from(row.querySelectorAll('td input')).map(input => input.value || "N/A")
+            );
+
+            return { title, type: "table", headers, rows };
+        }
+
+        // Fallback for other block types
+        const contentLines = [];
+        const inputs = block.querySelectorAll('input[type="text"]');
+        inputs.forEach(input => {
+            contentLines.push({ type: "text", value: input.value || "N/A" });
+        });
+
+        const images = block.querySelectorAll('.photo-container img');
+        images.forEach(img => {
+            if (img.src) {
+                contentLines.push({ type: "image", value: img.src });
+            }
+        });
+
+        return { title, contentLines };
+    }
+    function addRow(button) {
+        // Get the table body
+        const table = button.closest('.spreadsheet-container').querySelector('.dynamic-table');
+        const tbody = table.querySelector('tbody');
+        const columnCount = table.querySelector('thead tr').children.length;
+
+        // Create a new row
+        const row = document.createElement('tr');
+        for (let i = 0; i < columnCount; i++) {
+            const cell = document.createElement('td');
+            cell.innerHTML = '<input type="text" placeholder="Value">';
+            row.appendChild(cell);
+        }
+
+        // Append the new row to the table body
+        tbody.appendChild(row);
+    }
+
+    function removeRow(button) {
+        // Get the table body
+        const table = button.closest('.spreadsheet-container').querySelector('.dynamic-table');
+        const tbody = table.querySelector('tbody');
+
+        // Remove the last row (if there is more than one row)
+        if (tbody.children.length > 0) {
+            tbody.removeChild(tbody.lastChild);
+        } else {
+            alert('Cannot remove the last row - at least one row is required.');
+        }
+    }
+
+    function addColumn(button) {
+        // Get the table header and rows
+        const table = button.closest('.spreadsheet-container').querySelector('.dynamic-table');
+        const headerRow = table.querySelector('thead tr');
+
+        // Add a column to the header
+        const headerCell = document.createElement('th');
+        headerCell.innerHTML = '<input type="text" placeholder="Header">';
+        headerRow.appendChild(headerCell);
+
+        // Add cells to each row in the body
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            const cell = document.createElement('td');
+            cell.innerHTML = '<input type="text" placeholder="Value">';
+            row.appendChild(cell);
+        });
+    }
+
+    function removeColumn(button) {
+        // Get the table
+        const table = button.closest('.spreadsheet-container').querySelector('.dynamic-table');
+        const headerRow = table.querySelector('thead tr');
+
+        // Prevent removing columns if there's only one left
+        const columnCount = headerRow.children.length;
+        if (columnCount <= 1) {
+            alert('Cannot remove the last column - at least one column is required.');
+            return;
+        }
+
+        // Remove the last column from the header
+        headerRow.removeChild(headerRow.lastChild);
+
+        // Remove the last column from each row in the body
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            row.removeChild(row.lastChild);
+        });
+    }
+
+    function addImageToPDF(pdf, imageSource, pageWidth, yImagePosition, maxHeight) {
+        const imgWidth = pageWidth - 20; // Add some margin (adjustable)
+        const reader = new Image();
+
+        reader.onload = function () {
+            // Calculate aspect ratio to maintain proportions
+            const aspectRatio = reader.height / reader.width;
+            const imgHeight = Math.min(maxHeight, imgWidth * aspectRatio); // Scale down to fit height if needed
+
+            // Center the image horizontally
+            const xCentered = (pageWidth - imgWidth) / 2;
+
+            // Add the image to the PDF
+            pdf.addImage(imageSource, "JPEG", xCentered, yImagePosition, imgWidth, imgHeight);
+        };
+
+        reader.src = imageSource;
+    }
+</script>
+
+</body>
+
+</html>
