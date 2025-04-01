@@ -229,7 +229,7 @@
         const defaultBackgroundPath = "images/default-background.jpg"; // Background for subsequent pages
 
         // LOGO - Front page
-        const logoPath = "images/logofas.jpg";
+        const logoPath = "images/logofas.png";
         const logoWidth = 80;
         const logoHeight = 30;
         const logoX = 10;
@@ -386,37 +386,83 @@
      * Ensures the background image is fully loaded before continuing.
      */
     async function renderPageTemplate(pdf, pageWidth, pageHeight, headerText, footerText) {
-        // Define the background image path
-        const bgImagePath = "images/background.png";
+        // Define header height
+        const headerHeight = 20;
 
-        // Wait for the background image to load
+        // Path to the logo image
+        const logoImagePath = "images/logofas.png";
+        const logoWidth = 33; // Width of the logo
+        const logoHeight = 11; // Height of the logo
+
+        // Offset where gradient and text should start (just after the logo)
+        const gradientStartX = logoWidth - 10 ; // 5 units margin before and after the logo
+
+        // Create a gradient using a canvas
+        const canvas = document.createElement("canvas");
+        canvas.width = pageWidth;
+        canvas.height = headerHeight;
+        const ctx = canvas.getContext("2d");
+
+        // Create the gradient (start immediately after the logo and go to the right)
+        const gradient = ctx.createLinearGradient(gradientStartX, 0, pageWidth, 0);
+        gradient.addColorStop(0, "#133058"); // Dark blue
+        gradient.addColorStop(1, "#5b80b7"); // White at the far right
+
+        // Fill the gradient rectangle
+        ctx.fillStyle = gradient;
+        ctx.fillRect(gradientStartX, 0, pageWidth - gradientStartX, headerHeight);
+
+        // Convert the gradient area to a data URL
+        const gradientImage = canvas.toDataURL("image/png");
+
+        // Add the gradient rectangle to the PDF
+        pdf.addImage(gradientImage, "PNG", gradientStartX, 0, pageWidth - gradientStartX, headerHeight);
+
+        // Add the logo to the PDF
+        await new Promise((resolve, reject) => {
+            const logoImage = new Image();
+            logoImage.onload = function () {
+                pdf.addImage(logoImage, "JPEG", 5, (headerHeight - logoHeight) / 2, logoWidth, logoHeight);
+                resolve();
+            };
+            logoImage.onerror = function () {
+                console.error("Failed to load the logo image:", logoImagePath);
+                reject("Logo could not be loaded.");
+            };
+            logoImage.src = logoImagePath;
+        });
+
+        // Add the header text properly aligned inside the gradient
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(10);
+        pdf.setTextColor("#FFFFFF"); // White text to match gradient background
+        const textX = gradientStartX + 25; // Adjust text position inside the gradient
+        const textY = headerHeight / 2 + 3; // Vertically center the text
+        pdf.text(headerText, textX, textY);
+
+        // Optional: Add a Background Image Below Header
+        const bgImagePath = "images/background.png";
         await new Promise((resolve, reject) => {
             const bgImage = new Image();
             bgImage.onload = function () {
-                // Add the background image to cover the entire page
-                pdf.addImage(bgImage, "JPEG", 0, 0, pageWidth, pageHeight);
-                resolve(); // Resolve the promise after the image is added
+                pdf.addImage(bgImage, "JPEG", 0, headerHeight, pageWidth, pageHeight - headerHeight);
+                resolve();
             };
             bgImage.onerror = function () {
-                console.error("Failed to load background image:", bgImagePath);
-                reject("Image could not be loaded.");
+                console.error("Failed to load the background image:", bgImagePath);
+                reject("Background image could not be loaded.");
             };
-            bgImage.src = bgImagePath; // Trigger the image loading
+            bgImage.src = bgImagePath;
         });
 
-        // Add the header
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(10);
-        pdf.setTextColor("#133058");
-        pdf.text(headerText, 10, 10);
-
-        // Add the footer with the page number
+        // Add the footer content
         pdf.setFont("helvetica", "italic");
         pdf.setFontSize(8);
-        pdf.setTextColor("#133058");
+        pdf.setTextColor("#133058"); // Footer text color
         const pageNumber = pdf.internal.getNumberOfPages();
         pdf.text(`${footerText} ${pageNumber}`, pageWidth - 20, pageHeight - 10);
     }
+
     // Helper: Extract static form values
     // Fetch static form field values as an object keyed by field IDs
     function getStaticFormValues() {
